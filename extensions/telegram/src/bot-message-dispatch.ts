@@ -47,6 +47,7 @@ import {
   resolveChunkMode,
   resolveMarkdownTableMode,
   resolveSessionStoreEntry,
+  updateSessionStore,
 } from "./bot-message-dispatch.runtime.js";
 import type { TelegramBotOptions } from "./bot.types.js";
 import { deliverReplies, emitInternalMessageSentHook } from "./bot/delivery.js";
@@ -1262,6 +1263,18 @@ export const dispatchTelegramMessage = async ({
             logVerbose(`auto-topic-label: generated label (len=${label.length})`);
             await bot.api.editForumTopic(chatId, topicThreadId, { name: label });
             logVerbose(`auto-topic-label: renamed topic ${chatId}/${topicThreadId}`);
+            if (ctxPayload.SessionKey) {
+              const storePath = telegramDeps.resolveStorePath(cfg.session?.store, {
+                agentId: route.agentId,
+              });
+              void updateSessionStore(storePath, (store) => {
+                const entry = store[ctxPayload.SessionKey!] ?? {};
+                store[ctxPayload.SessionKey!] = entry;
+                entry.label = label;
+              }).catch(() => {
+                logVerbose("auto-topic-label: session label sync failed");
+              });
+            }
           } catch (err) {
             logVerbose(`auto-topic-label: failed: ${formatErrorMessage(err)}`);
           }
